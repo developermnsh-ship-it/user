@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Manish Online Quiz Portal</title>
+    <style>
+        :root { --p: #2c3e50; --s: #27ae60; --d: #e74c3c; --b: #3498db; }
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; margin: 0; padding: 10px; box-sizing: border-box; }
+        .container { width: 100%; max-width: 480px; margin: 10px auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); min-height: 85vh; display: flex; flex-direction: column; }
+        .hidden { display: none; }
+        #q-text { font-size: 1.2rem; color: var(--p); margin: 20px 0; min-height: 50px; line-height: 1.4; font-weight: 600; }
+        .option-btn { display: block; width: 100%; margin: 12px 0; padding: 15px; border: 2px solid #f0f0f0; border-radius: 12px; background: #fff; text-align: left; font-size: 16px; cursor: pointer; outline: none; }
+        .option-btn.selected { border-color: var(--b); background: #ebf5fb; font-weight: bold; }
+        .nav-btns { display: flex; justify-content: space-between; margin-top: auto; padding-top: 20px; gap: 10px; }
+        .btn { padding: 14px 20px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; font-size: 15px; }
+        .btn-submit { background: var(--s); color: white; width: 100%; margin-top: 15px; }
+        #timer { text-align: center; font-weight: bold; color: var(--d); font-size: 1.2rem; margin-bottom: 15px; }
+        .sol-card { border-bottom: 2px solid #f9f9f9; padding: 15px 0; text-align: left; }
+        .sol-explain { background: #fff9db; padding: 12px; border-radius: 8px; font-size: 14px; margin-top: 8px; border-left: 4px solid #fab005; }
+
+        /* Stylish Join Now Button */
+        .join-box {
+            margin-top: 30px;
+            padding: 20px;
+            background: #e8f9ee;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px dashed #25d366;
+        }
+        .whatsapp-btn {
+            background-color: #25d366;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);
+        }
+        .whatsapp-btn:active { transform: scale(0.97); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="screen-start">
+        <h2 style="text-align:center; color: var(--p);">Study Exam Portal</h2>
+        <div style="text-align:center; margin: 40px 0; padding: 30px; background: #f0f7ff; border-radius: 12px;">
+            <p style="margin:0; color: #555;">Available Questions</p>
+            <span id="q-count" style="font-weight:bold; font-size:48px; color: var(--b);">0</span>
+        </div>
+        <button class="btn btn-submit" style="height: 60px; font-size: 18px;" onclick="startQuiz()">START TEST</button>
+
+        <div class="join-box">
+            <p style="margin:0 0 10px 0; font-size: 14px; color: #444;">PDF और नए अपडेट के लिए ज्वाइन करें</p>
+            <button class="whatsapp-btn" onclick="joinGroup()">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" width="20" height="20" alt="WA">
+                JOIN WHATSAPP GROUP
+            </button>
+        </div>
+    </div>
+
+    <div id="screen-quiz" class="hidden">
+        <div id="timer">00:00</div>
+        <div style="font-size: 14px; color: #888; text-align: center;">Question <span id="q-num">1</span></div>
+        <h3 id="q-text">Loading...</h3>
+        <div id="options-box"></div>
+        <div class="nav-btns">
+            <button class="btn btn-prev" id="prevBtn" onclick="prevQ()">Previous</button>
+            <button class="btn btn-next" id="nextBtn" onclick="nextQ()">Next</button>
+        </div>
+        <button id="finalSubmit" class="btn btn-submit hidden" onclick="endQuiz()">Submit Final Test</button>
+    </div>
+
+    <div id="screen-result" class="hidden">
+        <h2 style="text-align:center">Result</h2>
+        <div style="text-align:center; margin: 30px 0;">
+            <h1 id="res-score" style="font-size:52px; margin:0; color: var(--s);">0/0</h1>
+            <p>Time: <span id="res-time">0</span>s</p>
+        </div>
+        <button class="btn btn-submit" onclick="showSolutions()">Review Answers</button>
+        <button class="btn" style="width:100%; margin-top:10px; background:#f0f0f0;" onclick="location.reload()">Home</button>
+        <div id="solutions-area" class="hidden"></div>
+    </div>
+</div>
+
+<script>
+    const API_URL = "https://sheetdb.io/api/v1/zllld3nilmrjn";
+    const WA_LINK = "https://chat.whatsapp.com/EFYoY9oayiqJs0TWD8GOqL";
+    
+    let questions = [], currentIdx = 0, timerInterval, seconds = 0, userChoices = {};
+
+    // WhatsApp Redirection
+    function joinGroup() {
+        window.open(WA_LINK, '_blank');
+    }
+
+    async function init() {
+        try {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            const now = Date.now();
+            // Sirf 24 ghante purane sawal
+            questions = data.filter(q => (now - q.timestamp) < (24 * 60 * 60 * 1000));
+            if(questions.length === 0) questions = data; // Agar naye nahi hain toh purane dikhaye
+            document.getElementById('q-count').innerText = questions.length;
+        } catch (e) { document.getElementById('q-count').innerText = "!"; }
+    }
+    init();
+
+    function startQuiz() {
+        if(questions.length === 0) return alert("Loading questions...");
+        document.getElementById('screen-start').classList.add('hidden');
+        document.getElementById('screen-quiz').classList.remove('hidden');
+        timerInterval = setInterval(() => {
+            seconds++;
+            let m = Math.floor(seconds/60), s = seconds%60;
+            document.getElementById('timer').innerText = `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
+        }, 1000);
+        showQuestion();
+    }
+
+    function showQuestion() {
+        const q = questions[currentIdx];
+        document.getElementById('q-num').innerText = `${currentIdx + 1} / ${questions.length}`;
+        document.getElementById('q-text').innerText = q.question;
+        const box = document.getElementById('options-box');
+        box.innerHTML = '';
+        [q.opt1, q.opt2, q.opt3, q.opt4].forEach((txt, i) => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn' + (userChoices[currentIdx] === (i+1) ? ' selected' : '');
+            btn.innerText = txt;
+            btn.onclick = () => { userChoices[currentIdx] = i+1; showQuestion(); };
+            box.appendChild(btn);
+        });
+        document.getElementById('prevBtn').style.visibility = currentIdx === 0 ? 'hidden' : 'visible';
+        if(currentIdx === questions.length - 1) {
+            document.getElementById('nextBtn').classList.add('hidden');
+            document.getElementById('finalSubmit').classList.remove('hidden');
+        } else {
+            document.getElementById('nextBtn').classList.remove('hidden');
+            document.getElementById('finalSubmit').classList.add('hidden');
+        }
+    }
+
+    function nextQ() { currentIdx++; showQuestion(); }
+    function prevQ() { currentIdx--; showQuestion(); }
+
+    function endQuiz() {
+        clearInterval(timerInterval);
+        let score = 0;
+        questions.forEach((q, i) => { if(userChoices[i] == q.correct) score++; });
+        document.getElementById('screen-quiz').classList.add('hidden');
+        document.getElementById('screen-result').classList.remove('hidden');
+        document.getElementById('res-score').innerText = `${score} / ${questions.length}`;
+        document.getElementById('res-time').innerText = seconds;
+    }
+
+    function showSolutions() {
+        const area = document.getElementById('solutions-area');
+        area.classList.remove('hidden');
+        area.innerHTML = "<h3 style='margin-top:20px'>Solutions:</h3>";
+        questions.forEach((q, i) => {
+            area.innerHTML += `
+                <div class="sol-card">
+                    <strong>Q${i+1}: ${q.question}</strong><br>
+                    <small style="color:green">Sahi Jawab: ${q['opt'+q.correct]}</small>
+                    <div class="sol-explain"><b>Solution:</b> ${q.solution || 'No detail.'}</div>
+                </div>`;
+        });
+    }
+</script>
+</body>
+</html>
